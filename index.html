@@ -59,7 +59,7 @@ td.n{text-align:right}
   <div class="card col">
     <p>This takes about 10 minutes. First you'll answer a few short questions about yourself.</p>
     <p>Then you'll do <strong>three short word tests</strong>, each followed by a few quick questions. Please keep your headphones on the whole time.</p>
-    <p>There are no right or wrong answers about yourself, and your responses are anonymous.</p>
+    <p>There are no right or wrong answers about yourself, and your answers are only seen by the research team.</p>
   </div>
   <button data-go="s-bio">Continue</button>
 </section>
@@ -68,6 +68,8 @@ td.n{text-align:right}
 <section class="stage" id="s-bio" hidden>
   <form class="col" id="bioForm" novalidate>
     <h2>About you</h2>
+    <label for="name">Name</label>
+    <input id="name" type="text" autocomplete="name" maxlength="80">
     <label for="age">Age</label>
     <input id="age" type="number" min="16" max="99" inputmode="numeric">
     <fieldset><legend>Gender</legend><div class="chips" data-name="gender"></div></fieldset>
@@ -193,18 +195,20 @@ const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.
 const rand=n=>crypto.getRandomValues(new Uint32Array(1))[0]%n;
 const pid='P-'+Array.from({length:6},()=>"ABCDEFGHJKMNPQRSTUVWXYZ23456789"[rand(31)]).join('');
 
-/* Session starts on page load: anonymous id + random hidden condition order */
+/* Session starts on page load: random participant id + random hidden condition order */
 const S={pid,order:ORDERS[rand(ORDERS.length)],bio:{},blocks:[],idx:0};
 
 /* biodata */
 $('bioForm').addEventListener('submit',e=>{
   e.preventDefault();
+  const name=$('name').value.trim();
+  if(!name){$('bioErr').textContent='Please enter your name.';return}
   const age=parseInt($('age').value,10);
   if(!(age>=16&&age<=99)){$('bioErr').textContent='Please enter your age.';return}
   for(const n of ['gender','english'])if(!pick(n)){$('bioErr').textContent='Please answer each question.';return}
   $('bioErr').textContent='';
   const g=pick('gender');
-  S.bio={age,gender:g==='Self-describe'&&$('gender_self').value.trim()?'Self-described: '+$('gender_self').value.trim():g,english:pick('english')};
+  S.bio={name,age,gender:g==='Self-describe'&&$('gender_self').value.trim()?'Self-described: '+$('gender_self').value.trim():g,english:pick('english')};
   view('s-instr');
 });
 
@@ -286,7 +290,7 @@ function toRow(s){
   const by={};s.blocks.forEach(b=>by[b.cond]=b);
   const r=[s.when,s.pid,orderName(s.order),by.S?.score??'',by.P?.score??'',by.L?.score??''];
   CKEYS.forEach(k=>{const q=by[k]?.qs||{};r.push(q.often??'',q.like!=null?+q.like:'',q.heard??'',q.times??'')});
-  r.push(s.bio.age,s.bio.gender,s.bio.english);
+  r.push(s.bio.name,s.bio.age,s.bio.gender,s.bio.english);
   CKEYS.forEach(k=>{const b=by[k]||{};r.push(b.pos??'',b.list??'',(b.correct||[]).join(', '),(b.intrusions||[]).join(', '),b.typed??'',b.recallSecs??'')});
   return r;
 }

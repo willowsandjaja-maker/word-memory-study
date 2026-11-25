@@ -14,7 +14,7 @@ const HEADERS = [
   .concat(...CONDS.map(n => [
     `${n}: how often study with`, `${n}: like (1-5)`, `${n}: heard before`, `${n}: times heard`,
   ]))
-  .concat(['Age', 'Gender', 'English first language'])
+  .concat(['Name', 'Age', 'Gender', 'English first language'])
   .concat(...CONDS.map(n => [
     `${n} position`, `${n} word list`, `${n} correct words`, `${n} intrusions`, `${n} typed`, `${n} recall time (s)`,
   ]));
