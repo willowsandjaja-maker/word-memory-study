@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Word Memory Study</title>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm lab stimulus — nothing on screen competes with the words
+   IDEA: the yellow-title / white-word slide deck from the shape and word tests
+   PICTURE: one huge black word, centred, during each test
+   COLOUR and TYPE: #FFC000 title fields, black on white, Jost
+   LAYOUT: one full-screen step at a time; forms in one calm column */
+:root{color-scheme:light;--y:#FFC000;--ink:#000;--bg:#fff;--mute:#555}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 Jost,"Avenir Next",Avenir,system-ui,sans-serif;overflow-x:clip}
+.stage{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center}
+.yellow{background:var(--y)}
+.col{width:min(560px,100%);text-align:start}
+h1{font-size:clamp(40px,8vw,84px);line-height:1.05;margin:0;font-weight:700;text-wrap:balance}
+h2{font-size:clamp(28px,5vw,44px);line-height:1.1;margin:0 0 10px;font-weight:700}
+.sub{margin:8px 0 26px;font-size:clamp(15px,2vw,19px)}
+.card{background:#fff;border:2px solid #000;border-radius:14px;padding:8px 22px;margin:0 0 24px;text-align:start}
+.card p{margin:10px 0}
+.word{font-weight:700;font-size:clamp(48px,13vw,170px);line-height:1;margin:0}
+.bar{position:fixed;left:0;bottom:0;height:4px;background:#000;width:0}
+.count{position:fixed;top:16px;right:20px;font-size:14px;color:#888}
+.ready{font-size:clamp(60px,14vw,160px);font-weight:700}
+label{display:block;margin:16px 0 6px;font-weight:500}
+.opt{font-weight:400;color:var(--mute);font-size:15px}
+input,select,textarea{width:100%;font:inherit;font-size:16px;border:2px solid #000;border-radius:10px;padding:10px 12px;background:#fff;color:#000}
+textarea{min-height:190px}
+fieldset{border:0;padding:0;margin:18px 0 0}
+legend{font-weight:500;padding:0;margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips label{margin:0;font-weight:400;display:flex;align-items:center;gap:8px;border:2px solid #000;border-radius:999px;padding:8px 16px;min-height:44px;cursor:pointer;background:#fff}
+.chips input{width:auto;margin:0;accent-color:#000}
+.chips label:has(input:checked){background:#000;color:#fff}
+button{font:inherit;font-weight:500;font-size:17px;min-height:48px;padding:0 28px;border-radius:999px;border:2px solid #000;background:#000;color:#fff;cursor:pointer}
+button.ghost{background:transparent;color:#000}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:3px solid #000;outline-offset:3px}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+.err{color:#b00020;font-size:15px;min-height:1.5em;margin:10px 0 0}
+.note{font-size:14px;color:var(--mute)}
+.pill{display:inline-block;border:2px solid #000;border-radius:999px;padding:2px 12px;font-size:15px;margin:2px 4px 2px 0;background:#fff}
+.ok{color:#0a7d2c}.bad{color:#b00020}
+.status{padding:12px 16px;border-radius:12px;border:2px solid #000;margin-top:18px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin-top:10px}
+td,th{border-bottom:1px solid #ccc;padding:6px 4px;text-align:start}
+td.n{text-align:right}
+.scroll{overflow-x:auto}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.bar{transition:none!important}}
+</style></head><body>
+
+<!-- WELCOME -->
+<section class="stage yellow" id="s-welcome">
+  <h1>Word Memory Study</h1>
+  <p class="sub">Thank you for taking part!</p>
+  <div class="card col">
+    <p>This takes about 10 minutes. First you'll answer a few short questions about yourself.</p>
+    <p>Then you'll do <strong>three short word tests</strong>, each followed by a few quick questions. Please keep your headphones on the whole time.</p>
+    <p>There are no right or wrong answers about yourself, and your responses are anonymous.</p>
+  </div>
+  <button data-go="s-bio">Continue</button>
+</section>
+
+<!-- BIODATA -->
+<section class="stage" id="s-bio" hidden>
+  <form class="col" id="bioForm" novalidate>
+    <h2>About you</h2>
+    <label for="age">Age</label>
+    <input id="age" type="number" min="16" max="99" inputmode="numeric">
+    <fieldset><legend>Gender</legend><div class="chips" data-name="gender"></div></fieldset>
+    <label for="gender_self" id="gselfL" hidden>Please describe <span class="opt">(optional)</span></label>
+    <input id="gender_self" hidden>
+    <fieldset><legend>Is English your first language?</legend><div class="chips" data-name="english"></div></fieldset>
+    <p class="err" id="bioErr"></p>
+    <div class="row"><button type="submit">Next</button></div>
+  </form>
+</section>
+
+<!-- INSTRUCTIONS -->
+<section class="stage yellow" id="s-instr" hidden>
+  <h1>Word Test</h1>
+  <p class="sub">Memorize as many words as you can!!</p>
+  <div class="card col">
+    <p><strong>How it works</strong></p>
+    <p>You will be shown a series of random words, one at a time, every <strong>3 seconds</strong>.</p>
+    <p>Try to memorize as many of the words as possible. You can't go back, so give each word your full attention.</p>
+    <p>At the end of each test, you'll type every word you can remember, in any order.</p>
+    <p>You'll do this <strong>three times</strong>, with a new set of words each time. After each test you'll answer a few short questions. Just focus on the words.</p>
+  </div>
+  <button data-go="s-block">I'm ready</button>
+</section>
+
+<!-- BLOCK INTRO -->
+<section class="stage yellow" id="s-block" hidden>
+  <p class="sub" id="blockLabel" style="margin:0 0 6px"></p>
+  <h1 id="blockTitle"></h1>
+  <p class="sub">When you press Start, the words will begin shortly.</p>
+  <button id="startBlock">Start</button>
+</section>
+
+<!-- WORDS -->
+<section class="stage" id="s-show" hidden>
+  <span class="count" id="count"></span>
+  <p class="word" id="word"></p>
+  <div class="bar" id="bar"></div>
+</section>
+
+<!-- RECALL -->
+<section class="stage" id="s-recall" hidden>
+  <div class="col">
+    <h2>Time's up</h2>
+    <p>Type every word you remember. Put each one on a new line or separate them with commas. The order doesn't matter.</p>
+    <textarea id="answers" aria-label="Words you remember" placeholder="Start typing…"></textarea>
+    <p class="err" id="recallErr"></p>
+    <div class="row"><button id="submitRecall">Done</button></div>
+  </div>
+</section>
+
+<!-- PER-TEST QUESTIONNAIRE -->
+<section class="stage" id="s-like" hidden>
+  <form class="col" id="likeForm" novalidate>
+    <h2>A few questions</h2>
+    <fieldset><legend>1) How often do you study with <span class="X"></span>?</legend><div class="chips" data-name="qOften"></div></fieldset>
+    <fieldset><legend>2) How do you like <span class="X"></span>? <span class="opt">(1 = not at all, 5 = very much)</span></legend><div class="chips" data-name="qLike"></div></fieldset>
+    <div id="qHeardWrap">
+      <fieldset><legend>3) Have you heard <span class="X"></span> before taking this experiment?</legend><div class="chips" data-name="qHeard"></div></fieldset>
+      <fieldset><legend>4) How many times have you heard <span class="X"></span>?</legend><div class="chips" data-name="qTimes"></div></fieldset>
+    </div>
+    <p class="err" id="likeErr"></p>
+    <div class="row"><button type="submit">Next</button></div>
+  </form>
+</section>
+
+<!-- THANK YOU -->
+<section class="stage yellow" id="s-thanks" hidden>
+  <h1>Thank you!</h1>
+  <p class="sub">You're all done. Thank you for helping with our research.</p>
+  <div class="card col">
+    <p id="saveMsg">Saving your answers…</p>
+    <div class="row"><button id="retryBtn" hidden>Try again</button></div>
+  </div>
+</section>
+
+
+<audio id="aud-pink" src="audio/pink-noise.mp3" preload="auto" loop></audio>
+<audio id="aud-lyr" src="audio/lyrical.mp3" preload="auto" loop></audio>
+
+<script>
+{
+/* ===== CONFIG — set SHEET_ENDPOINT to the deployed Apps Script web app URL (see HANDOFF.md) ===== */
+const SHEET_ENDPOINT="PASTE_APPS_SCRIPT_WEB_APP_URL_HERE";
+const SECS=3;
+const LISTS={
+  A:["ANCHOR","VIOLIN","CACTUS","HELMET","TOASTER","PLANET","ZIPPER","LEMON","CASTLE","FEATHER","WALLET","TIGER","COMPASS","CARPET","ROCKET","SOAP"],
+  B:["BUCKET","GUITAR","ONION","SADDLE","KETTLE","TURTLE","BRIDGE","HAMMER","CRAYON","PILLOW","TRUMPET","GLACIER","BUTTON","DOLPHIN","TICKET","CABBAGE"],
+  C:["PEPPER","LANTERN","SPIDER","CANOE","TOWEL","MAGNET","ORCHID","PARROT","SCISSORS","VOLCANO","BRUSH","CHIMNEY","BANANA","SOCKET","IGLOO","WAGON"]
+};
+const LIST_BY_POS=["A","B","C"];
+const COND={
+  S:{name:"Silence",audio:null,x:"silence (no background sound)",heardQs:false},
+  P:{name:"Pink noise",audio:"aud-pink",x:"the steady noise you just heard (pink noise)",heardQs:true},
+  L:{name:"Lyrical",audio:"aud-lyr",x:"the song you just heard",heardQs:true}};
+const CKEYS=["S","P","L"];
+const ORDERS=["SPL","SLP","PSL","PLS","LSP","LPS"];
+const orderName=o=>[...o].map(k=>COND[k].name).join(" → ");
+
+const $=id=>document.getElementById(id);
+const view=id=>{document.querySelectorAll('.stage').forEach(s=>s.hidden=s.id!==id);window.scrollTo(0,0)};
+document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.go==='s-block')showBlock();view(b.dataset.go)}));
+
+const CHIPS={
+  gender:["Woman","Man","Non-binary","Self-describe","Prefer not to say"],
+  english:["Yes","No"],
+  qOften:["Often","Once in a while","Occasionally","Once or twice","Never"],
+  qLike:["1","2","3","4","5"],
+  qHeard:["Yes","No"],
+  qTimes:["Often","Once in a while","Occasionally","Never"]
+};
+document.querySelectorAll('.chips').forEach(box=>{
+  const n=box.dataset.name;
+  CHIPS[n].forEach((v,i)=>{
+    const l=document.createElement('label'),inp=document.createElement('input');
+    inp.type='radio';inp.name=n;inp.value=v;inp.id=n+i;l.append(inp,document.createTextNode(v));box.append(l);
+  });
+});
+const pick=n=>[...document.querySelectorAll(`input[name="${n}"]:checked`)].map(i=>i.value).join("; ");
+document.querySelectorAll('input[name="gender"]').forEach(r=>r.addEventListener('change',()=>{const s=pick('gender')==='Self-describe';$('gselfL').hidden=!s;$('gender_self').hidden=!s}));
+
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const rand=n=>crypto.getRandomValues(new Uint32Array(1))[0]%n;
+const pid='P-'+Array.from({length:6},()=>"ABCDEFGHJKMNPQRSTUVWXYZ23456789"[rand(31)]).join('');
+
+/* Session starts on page load: anonymous id + random hidden condition order */
+const S={pid,order:ORDERS[rand(ORDERS.length)],bio:{},blocks:[],idx:0};
+
+/* biodata */
+$('bioForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const age=parseInt($('age').value,10);
+  if(!(age>=16&&age<=99)){$('bioErr').textContent='Please enter your age.';return}
+  for(const n of ['gender','english'])if(!pick(n)){$('bioErr').textContent='Please answer each question.';return}
+  $('bioErr').textContent='';
+  const g=pick('gender');
+  S.bio={age,gender:g==='Self-describe'&&$('gender_self').value.trim()?'Self-described: '+$('gender_self').value.trim():g,english:pick('english')};
+  view('s-instr');
+});
+
+/* blocks */
+function showBlock(){
+  $('blockLabel').textContent=`Test ${S.idx+1} of 3`;
+  $('blockTitle').textContent=S.idx===0?'Ready?':'Next test';
+}
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+let timer=null,curAudio=null;
+function stopAudio(){if(curAudio){curAudio.pause();curAudio=null}}
+$('startBlock').addEventListener('click',()=>{
+  const ck=S.order[S.idx],listKey=LIST_BY_POS[S.idx];
+  const words=shuffle(LISTS[listKey]);
+  S.cur={cond:ck,list:listKey,pos:S.idx+1,shown:words};
+  const aid=COND[ck].audio;
+  if(aid){curAudio=$(aid);curAudio.currentTime=0;curAudio.volume=1;curAudio.play().catch(()=>{})}
+  view('s-show');
+  let c=3;const w=$('word'),bar=$('bar');$('count').textContent='';bar.style.transition='none';bar.style.width='0';
+  w.className='ready';w.textContent=c;
+  const tick=()=>{c--;if(c>0){w.textContent=c;timer=setTimeout(tick,1000)}else{w.className='word';run(words)}};
+  timer=setTimeout(tick,1000);
+});
+function run(words){
+  let i=0;const bar=$('bar');
+  const step=()=>{
+    if(i>=words.length){toRecall();return}
+    $('word').textContent=words[i];$('count').textContent=(i+1)+' / '+words.length;
+    bar.style.transition='none';bar.style.width='0';void bar.offsetWidth;
+    bar.style.transition=`width ${SECS*1000}ms linear`;bar.style.width='100%';
+    i++;timer=setTimeout(step,SECS*1000);
+  };step();
+}
+function toRecall(){
+  clearTimeout(timer);stopAudio();
+  $('answers').value='';$('recallErr').textContent='';S.cur.recallStart=Date.now();
+  view('s-recall');setTimeout(()=>$('answers').focus(),50);
+}
+const norm=w=>w.trim().toUpperCase().replace(/[^A-Z]/g,'');
+function score(typed,list){
+  const set=new Set(list),got=new Set(),intr=[];
+  [...new Set(typed.split(/[\n,;]+/).map(norm).filter(Boolean))].forEach(w=>{
+    const m=set.has(w)?w:set.has(w.replace(/ES$/,''))?w.replace(/ES$/,''):set.has(w.replace(/S$/,''))?w.replace(/S$/,''):null;
+    if(m)got.add(m);else intr.push(w);
+  });
+  return{correct:[...got],intrusions:intr};
+}
+let recallEmptyOk=false;
+$('submitRecall').addEventListener('click',()=>{
+  const typed=$('answers').value;
+  if(!typed.trim()&&!recallEmptyOk){recallEmptyOk=true;$('recallErr').textContent="You haven't typed any words. Press Done again if you can't remember any.";return}
+  recallEmptyOk=false;
+  const r=score(typed,LISTS[S.cur.list]);
+  const {recallStart,...cur}=S.cur;
+  S.blocks.push({...cur,typed:typed.trim().replace(/\s*\n\s*/g,', '),correct:r.correct,intrusions:r.intrusions,score:r.correct.length,recallSecs:Math.round((Date.now()-recallStart)/1000)});
+  showQs();
+});
+
+/* per-test questionnaire */
+function showQs(){
+  const c=COND[S.blocks[S.blocks.length-1].cond];
+  $('likeForm').reset();$('likeErr').textContent='';
+  document.querySelectorAll('#likeForm .X').forEach(s=>s.textContent=c.x);
+  $('qHeardWrap').hidden=!c.heardQs;
+  view('s-like');
+}
+$('likeForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const b=S.blocks[S.blocks.length-1],c=COND[b.cond];
+  const need=c.heardQs?['qOften','qLike','qHeard','qTimes']:['qOften','qLike'];
+  for(const n of need)if(!pick(n)){$('likeErr').textContent='Please answer each question.';return}
+  b.qs={often:pick('qOften'),like:pick('qLike'),heard:c.heardQs?pick('qHeard'):'N/A',times:c.heardQs?pick('qTimes'):'N/A'};
+  S.idx++;
+  if(S.idx<3){showBlock();view('s-block')}else finish();
+});
+
+/* one row per participant — header order must match apps-script/Code.gs HEADERS */
+function toRow(s){
+  const by={};s.blocks.forEach(b=>by[b.cond]=b);
+  const r=[s.when,s.pid,orderName(s.order),by.S?.score??'',by.P?.score??'',by.L?.score??''];
+  CKEYS.forEach(k=>{const q=by[k]?.qs||{};r.push(q.often??'',q.like!=null?+q.like:'',q.heard??'',q.times??'')});
+  r.push(s.bio.age,s.bio.gender,s.bio.english);
+  CKEYS.forEach(k=>{const b=by[k]||{};r.push(b.pos??'',b.list??'',(b.correct||[]).join(', '),(b.intrusions||[]).join(', '),b.typed??'',b.recallSecs??'')});
+  return r;
+}
+async function send(rec){
+  if(!/^https:\/\/script\.google\.com\//.test(SHEET_ENDPOINT))throw new Error('endpoint not configured');
+  /* text/plain + no-cors avoids a CORS preflight, which Apps Script cannot answer */
+  await fetch(SHEET_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({row:toRow(rec)})});
+}
+/* unsent results are queued in this browser and retried on the next page load */
+const queue=()=>store.get('wms_queue',[]);
+async function flushQueue(){const q=queue(),left=[];for(const r of q){try{await send(r)}catch(e){left.push(r)}}store.set('wms_queue',left)}
+async function finish(){
+  const rec={...S,when:new Date().toISOString()};delete rec.cur;
+  view('s-thanks');await trySave(rec);
+}
+async function trySave(rec){
+  $('saveMsg').className='';$('saveMsg').textContent='Saving your answers…';$('retryBtn').hidden=true;
+  try{await send(rec);store.set('wms_queue',queue().filter(x=>x.pid!==rec.pid));$('saveMsg').className='ok';$('saveMsg').textContent='Your answers have been saved. You can close this page.'}
+  catch(e){
+    const q=queue();if(!q.some(x=>x.pid===rec.pid)){q.push(rec);store.set('wms_queue',q)}
+    $('saveMsg').className='bad';$('saveMsg').textContent="We couldn't save your answers. Check your internet connection and press Try again.";
+    $('retryBtn').hidden=false;$('retryBtn').onclick=()=>trySave(rec);
+  }
+}
+flushQueue();
+}
+</script>
+</body></html>
