@@ -101,6 +101,7 @@ td.n{text-align:right}
   <h1 id="blockTitle"></h1>
   <p class="sub">When you press Start, the words will begin shortly.</p>
   <button id="startBlock">Start</button>
+  <p class="err" id="audioMsg" role="status" style="max-width:520px"></p>
 </section>
 
 <!-- WORDS -->
@@ -220,12 +221,39 @@ function showBlock(){
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
 let timer=null,curAudio=null;
 function stopAudio(){if(curAudio){curAudio.pause();curAudio=null}}
-$('startBlock').addEventListener('click',()=>{
+/* Audio: start it inside the click (browsers only allow sound after a tap), wait until it is
+   really playing, and only then begin the countdown. If it can't start, stay on this screen. */
+const AUDIO_VOLUME=0.8;
+document.querySelectorAll('audio').forEach(a=>{try{a.load()}catch(e){}});
+function startAudio(a){
+  return new Promise((res,rej)=>{
+    let done=false;const fin=err=>{if(done)return;done=true;clearTimeout(t);err?rej(err):res()};
+    const t=setTimeout(()=>fin(new Error('timeout')),15000);
+    a.currentTime=0;a.volume=AUDIO_VOLUME;a.muted=false;
+    a.addEventListener('playing',()=>fin(),{once:true});
+    a.addEventListener('error',()=>fin(new Error('load')),{once:true});
+    const p=a.play();if(p&&p.catch)p.catch(fin);
+  });
+}
+$('startBlock').addEventListener('click',async()=>{
+  const btn=$('startBlock'),msg=$('audioMsg');
+  if(btn.disabled)return;
   const ck=S.order[S.idx],listKey=LIST_BY_POS[S.idx];
+  const aid=COND[ck].audio;
+  msg.textContent='';
+  if(aid){
+    btn.disabled=true;btn.textContent='Loading…';
+    try{curAudio=$(aid);await startAudio(curAudio)}
+    catch(e){
+      if(curAudio){curAudio.pause();curAudio=null}
+      btn.disabled=false;btn.textContent='Start';
+      msg.textContent="The sound didn't start. Make sure your headphones are connected and your volume is on, then press Start again.";
+      return;
+    }
+    btn.disabled=false;btn.textContent='Start';
+  }
   const words=shuffle(LISTS[listKey]);
   S.cur={cond:ck,list:listKey,pos:S.idx+1,shown:words};
-  const aid=COND[ck].audio;
-  if(aid){curAudio=$(aid);curAudio.currentTime=0;curAudio.volume=1;curAudio.play().catch(()=>{})}
   view('s-show');
   let c=3;const w=$('word'),bar=$('bar');$('count').textContent='';bar.style.transition='none';bar.style.width='0';
   w.className='ready';w.textContent=c;
@@ -294,10 +322,24 @@ function toRow(s){
   CKEYS.forEach(k=>{const b=by[k]||{};r.push(b.pos??'',b.list??'',(b.correct||[]).join(', '),(b.intrusions||[]).join(', '),b.typed??'',b.recallSecs??'')});
   return r;
 }
-async function send(rec){
-  if(!/^https:\/\/script\.google\.com\//.test(SHEET_ENDPOINT))throw new Error('endpoint not configured');
-  /* text/plain + no-cors avoids a CORS preflight, which Apps Script cannot answer */
-  await fetch(SHEET_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({row:toRow(rec)})});
+/* Sends the row as a GET request loaded as a script (JSONP). Unlike a no-cors POST, the page
+   gets the script's real answer back, so "saved" only shows when the row was actually added. */
+function send(rec){
+  return new Promise((res,rej)=>{
+    if(!/^https:\/\/script\.google\.com\//.test(SHEET_ENDPOINT))return rej(new Error('endpoint not configured'));
+    const cb='wmsCb'+Date.now()+rand(1e6),s=document.createElement('script');let done=false;
+    const t=setTimeout(()=>fin(new Error('timeout')),25000);
+    function fin(err,data){
+      if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(e){}s.remove();
+      if(err)return rej(err);
+      if(data&&data.ok)return res();
+      rej(new Error((data&&data.error)||'not saved'));
+    }
+    window[cb]=d=>fin(null,d);
+    s.onerror=()=>fin(new Error('blocked'));
+    s.src=SHEET_ENDPOINT+'?callback='+cb+'&payload='+encodeURIComponent(JSON.stringify({row:toRow(rec)}));
+    document.head.appendChild(s);
+  });
 }
 /* unsent results are queued in this browser and retried on the next page load */
 const queue=()=>store.get('wms_queue',[]);
@@ -310,6 +352,7 @@ async function trySave(rec){
   $('saveMsg').className='';$('saveMsg').textContent='Saving your answers…';$('retryBtn').hidden=true;
   try{await send(rec);store.set('wms_queue',queue().filter(x=>x.pid!==rec.pid));$('saveMsg').className='ok';$('saveMsg').textContent='Your answers have been saved. You can close this page.'}
   catch(e){
+    console.warn('Save failed:',e&&e.message);
     const q=queue();if(!q.some(x=>x.pid===rec.pid)){q.push(rec);store.set('wms_queue',q)}
     $('saveMsg').className='bad';$('saveMsg').textContent="We couldn't save your answers. Check your internet connection and press Try again.";
     $('retryBtn').hidden=false;$('retryBtn').onclick=()=>trySave(rec);
